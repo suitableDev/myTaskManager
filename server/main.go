@@ -54,11 +54,37 @@ func postTask(context *gin.Context) {
 	context.IndentedJSON(http.StatusCreated, newTask)
 }
 
+func deleteTask(context *gin.Context) {
+	id := context.Param("id")
+
+	// Find the index of the task with the matching ID
+	var taskIndex int
+	found := false
+	for i, task := range tasks {
+		if task.ID == id {
+			taskIndex = i
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+		return
+	}
+
+	// Remove the task from the slice
+	tasks = append(tasks[:taskIndex], tasks[taskIndex+1:]...)
+
+	context.IndentedJSON(http.StatusOK, gin.H{"message": "task deleted"})
+}
+
 func main() {
 	fmt.Println(tasks)
 	router := gin.Default()
 	router.GET("/tasks", getTasks)
 	router.GET("/tasks/:id", getTaskByID)
 	router.POST("/tasks", postTask)
+	router.DELETE("/tasks/:id", deleteTask)
 	router.Run("localhost:8080")
 }
