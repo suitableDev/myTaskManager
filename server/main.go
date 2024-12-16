@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +36,6 @@ func getTaskByID(context *gin.Context) {
 		}
 	}
 	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
-
 }
 
 // postTask adds an task from JSON received in the request body.
@@ -54,6 +52,39 @@ func postTask(context *gin.Context) {
 	context.IndentedJSON(http.StatusCreated, newTask)
 }
 
+// updateTask updates the task with an ID value that matches the id parameter sent by the client
+func updateTask(context *gin.Context) {
+	id := context.Param("id")
+	var updatedTask Task
+
+	// Call BindJSON to bind the received JSON to updatedTask.
+	if err := context.BindJSON(&updatedTask); err != nil {
+		return
+	}
+
+	// Find the index of the task with the matching ID
+	var taskIndex int
+	found := false
+	for i, task := range tasks {
+		if task.ID == id {
+			taskIndex = i
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+		return
+	}
+
+	// Update the task in the slice
+	tasks[taskIndex] = updatedTask
+
+	context.IndentedJSON(http.StatusOK, updatedTask)
+}
+
+// deleteTask deletes the task with an ID value matches the id parameter sent by the client
 func deleteTask(context *gin.Context) {
 	id := context.Param("id")
 
@@ -80,11 +111,11 @@ func deleteTask(context *gin.Context) {
 }
 
 func main() {
-	fmt.Println(tasks)
 	router := gin.Default()
 	router.GET("/tasks", getTasks)
 	router.GET("/tasks/:id", getTaskByID)
 	router.POST("/tasks", postTask)
+	router.PUT("/tasks/:id", updateTask)
 	router.DELETE("/tasks/:id", deleteTask)
 	router.Run("localhost:8080")
 }
