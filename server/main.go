@@ -88,26 +88,15 @@ func updateTask(context *gin.Context) {
 func deleteTask(context *gin.Context) {
 	id := context.Param("id")
 
-	// Find the index of the task with the matching ID
-	var taskIndex int
-	found := false
 	for i, task := range tasks {
 		if task.ID == id {
-			taskIndex = i
-			found = true
-			break
+			tasks = append(tasks[:i], tasks[i+1:]...)
+			context.IndentedJSON(http.StatusOK, gin.H{"message": "task deleted"})
+			return
 		}
 	}
 
-	if !found {
-		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
-		return
-	}
-
-	// Remove the task from the slice
-	tasks = append(tasks[:taskIndex], tasks[taskIndex+1:]...)
-
-	context.IndentedJSON(http.StatusOK, gin.H{"message": "task deleted"})
+	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
 }
 
 func main() {
