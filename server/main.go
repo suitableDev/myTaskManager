@@ -52,36 +52,24 @@ func postTask(context *gin.Context) {
 	context.IndentedJSON(http.StatusCreated, newTask)
 }
 
-// updateTask updates the task with an ID value that matches the id parameter sent by the client
 func updateTask(context *gin.Context) {
 	id := context.Param("id")
 	var updatedTask Task
 
-	// Call BindJSON to bind the received JSON to updatedTask.
-	if err := context.BindJSON(&updatedTask); err != nil {
+	if err := context.ShouldBindJSON(&updatedTask); err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Find the index of the task with the matching ID
-	var taskIndex int
-	found := false
 	for i, task := range tasks {
 		if task.ID == id {
-			taskIndex = i
-			found = true
-			break
+			tasks[i] = updatedTask
+			context.IndentedJSON(http.StatusOK, updatedTask)
+			return
 		}
 	}
 
-	if !found {
-		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
-		return
-	}
-
-	// Update the task in the slice
-	tasks[taskIndex] = updatedTask
-
-	context.IndentedJSON(http.StatusOK, updatedTask)
+	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
 }
 
 // deleteTask deletes the task with an ID value matches the id parameter sent by the client
