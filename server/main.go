@@ -14,7 +14,7 @@ type Task struct {
 }
 
 // Tasks slice to seed task data
-var tasks = map[]Task{
+var tasks = []Task{
 	{ID: "1", Title: "task 1"},
 	{ID: "2", Title: "task 2", Completed: true},
 }
