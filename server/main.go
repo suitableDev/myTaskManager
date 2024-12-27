@@ -14,7 +14,7 @@ type Task struct {
 }
 
 // Tasks slice to seed task data
-var tasks = []Task{
+var tasks = map[]Task{
 	{ID: "1", Title: "task 1"},
 	{ID: "2", Title: "task 2", Completed: true},
 }
@@ -28,7 +28,6 @@ func getTasks(context *gin.Context) {
 func getTaskByID(context *gin.Context) {
 	id := context.Param("id")
 
-	// Loop over the list of tasks, looking for matching ID
 	for _, a := range tasks {
 		if a.ID == id {
 			context.IndentedJSON(http.StatusOK, a)
@@ -42,12 +41,11 @@ func getTaskByID(context *gin.Context) {
 func postTask(context *gin.Context) {
 	var newTask Task
 
-	// Call BindJSON to bind the received JSON to newTask.
 	if err := context.BindJSON(&newTask); err != nil {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Add the new task to the slice.
 	tasks = append(tasks, newTask)
 	context.IndentedJSON(http.StatusCreated, newTask)
 }
@@ -56,8 +54,8 @@ func updateTask(context *gin.Context) {
 	id := context.Param("id")
 	var updatedTask Task
 
-	if err := context.ShouldBindJSON(&updatedTask); err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := context.BindJSON(&updatedTask); err != nil {
+		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
