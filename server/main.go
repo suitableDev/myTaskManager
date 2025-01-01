@@ -63,6 +63,10 @@ func postTask(context *gin.Context) {
 		return
 	}
 
+	if newTask.Status {
+		newTask.Status = false
+	}
+
 	if err := validate.Struct(newTask); err != nil {
 		respondWithError(context, http.StatusBadRequest, "validation error", err.Error())
 		return
