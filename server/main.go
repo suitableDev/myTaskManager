@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -10,9 +11,10 @@ import (
 
 // Task represents data about a task
 type Task struct {
-	ID     ksuid.KSUID `json:"id"`
-	Title  string      `json:"title" validate:"required"`
-	Status bool        `json:"status"`
+	ID      ksuid.KSUID `json:"id" validate:"required"`
+	Title   string      `json:"title" validate:"required,min=1,max=140"`
+	Status  bool        `json:"status"`
+	Created time.Time   `json:"created" validate:"required"`
 }
 
 var validate = validator.New()
@@ -21,6 +23,14 @@ var validate = validator.New()
 var tasks = []Task{
 	{ID: ksuid.New(), Title: "task 1"},
 	{ID: ksuid.New(), Title: "task 2", Status: true},
+}
+
+// Utility function for error response
+func respondWithError(context *gin.Context, code int, message string, details string) {
+	context.JSON(code, gin.H{
+		"error":   message,
+		"details": details,
+	})
 }
 
 // getTasks - responds with the list of all tasks as JSON.
@@ -45,14 +55,16 @@ func getTaskByID(context *gin.Context) {
 func postTask(context *gin.Context) {
 	var newTask Task
 	newTask.ID = ksuid.New()
+	newTask.Created = time.Now().UTC()
+	newTask.Status = false
 
 	if err := context.BindJSON(&newTask); err != nil {
-		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithError(context, http.StatusBadRequest, "invalid JSON", err.Error())
 		return
 	}
 
 	if err := validate.Struct(newTask); err != nil {
-		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "validation error", "details": err.Error()})
+		respondWithError(context, http.StatusBadRequest, "validation error", err.Error())
 		return
 	}
 
@@ -65,40 +77,36 @@ func updateTask(context *gin.Context) {
 	id := context.Param("id")
 
 	var updatedFields struct {
-		Title  *string `json:"title"`  // Pointer to check if field is present
-		Status *bool   `json:"status"` // Pointer to check if field is present
+		Title  *string `json:"title" validate:"omitempty,min=1"`
+		Status *bool   `json:"status"`
 	}
 
-	// Parse the JSON payload
 	if err := context.BindJSON(&updatedFields); err != nil {
-		context.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondWithError(context, http.StatusBadRequest, "invalid JSON", err.Error())
 		return
 	}
 
-	// Find the task by ID
+	if err := validate.Struct(updatedFields); err != nil {
+		respondWithError(context, http.StatusBadRequest, "validation error", err.Error())
+		return
+	}
+
 	for i, task := range tasks {
 		if task.ID.String() == id {
-			// Update the title if present and non-empty
+
 			if updatedFields.Title != nil {
-				if *updatedFields.Title == "" {
-					context.IndentedJSON(http.StatusBadRequest, gin.H{"error": "title cannot be empty"})
-					return
-				}
 				tasks[i].Title = *updatedFields.Title
 			}
 
-			// Update the status if present
 			if updatedFields.Status != nil {
 				tasks[i].Status = *updatedFields.Status
 			}
 
-			// Respond with the updated task
 			context.IndentedJSON(http.StatusOK, tasks[i])
 			return
 		}
 	}
 
-	// Task not found
 	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
 }
 
