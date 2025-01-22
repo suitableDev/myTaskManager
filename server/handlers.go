@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/segmentio/ksuid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var validate = validator.New()
@@ -18,21 +23,46 @@ var tasks = []Task{
 }
 
 // getTasks - responds with the list of all tasks as JSON.
-func getTasks(context *gin.Context) {
-	context.IndentedJSON(http.StatusOK, tasks)
+func getTasks(ctx *gin.Context) {
+	cursor, err := mongoClient.Database("task_manager").Collection("tasks").Find(context.TODO(), bson.D{{}}, options.Find().SetLimit(2))
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "error fetching tasks", err.Error())
+		return
+	}
+
+	var tasks []bson.M
+	if err = cursor.All(context.TODO(), &tasks); err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "error decoding tasks", err.Error())
+		return
+	}
+
+	ctx.IndentedJSON(http.StatusOK, tasks)
 }
 
 // getTaskByID returns task with an ID value matches the id parameter sent by the client
-func getTaskByID(context *gin.Context) {
-	id := context.Param("id")
+func getTaskByID(ctx *gin.Context) {
+	idStr := ctx.Param("id")
 
-	for _, a := range tasks {
-		if a.ID.String() == id {
-			context.IndentedJSON(http.StatusOK, a)
-			return
-		}
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		return
 	}
-	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+
+	var task bson.M
+	result := mongoClient.Database("task_manager").Collection("tasks").FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
+
+	err = result.Decode(&task)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			respondWithError(ctx, http.StatusNotFound, "Task not found", err.Error())
+		} else {
+			respondWithError(ctx, http.StatusInternalServerError, "Error retrieving task", err.Error())
+		}
+		return
+	}
+
+	ctx.IndentedJSON(http.StatusOK, task)
 }
 
 // postTask adds a task from JSON received in the request body.
