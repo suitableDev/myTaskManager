@@ -92,40 +92,51 @@ func postTask(ctx *gin.Context) {
 
 // updateTask updates the task with an ID value that matches the id parameter sent by the client
 func updateTask(ctx *gin.Context) {
-	// id := context.Param("id")
+	idStr := ctx.Param("id")
 
-	// var updatedFields struct {
-	// 	Title  *string `json:"title" validate:"omitempty,min=1"`
-	// 	Status *bool   `json:"status"`
-	// }
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		return
+	}
 
-	// if err := context.BindJSON(&updatedFields); err != nil {
-	// 	respondWithError(context, http.StatusBadRequest, "invalid JSON", err.Error())
-	// 	return
-	// }
+	var updatedFields struct {
+		Title  *string `json:"title" validate:"omitempty,min=1"`
+		Status *bool   `json:"status"`
+	}
 
-	// if err := validate.Struct(updatedFields); err != nil {
-	// 	respondWithError(context, http.StatusBadRequest, "validation error", err.Error())
-	// 	return
-	// }
+	if err := ctx.BindJSON(&updatedFields); err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid JSON", err.Error())
+		return
+	}
 
-	// for i, task := range tasks {
-	// 	if task.ID.String() == id {
+	if err := validate.Struct(updatedFields); err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
+		return
+	}
 
-	// 		if updatedFields.Title != nil {
-	// 			tasks[i].Title = *updatedFields.Title
-	// 		}
+	update := bson.M{}
+	if updatedFields.Title != nil {
+		update["title"] = *updatedFields.Title
+	}
+	if updatedFields.Status != nil {
+		update["status"] = *updatedFields.Status
+	}
 
-	// 		if updatedFields.Status != nil {
-	// 			tasks[i].Status = *updatedFields.Status
-	// 		}
+	result, err := mongoClient.Database("task_manager").Collection("tasks").UpdateOne(context.TODO(), bson.M{"_id": id}, bson.M{"$set": update})
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error updating task", err.Error())
+		return
+	}
 
-	// 		context.IndentedJSON(http.StatusOK, tasks[i])
-	// 		return
-	// 	}
-	// }
+	if result.MatchedCount == 0 {
+		respondWithError(ctx, http.StatusNotFound, "Task not found", "")
+		return
+	}
 
-	// context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Task updated successfully",
+	})
 }
 
 // deleteTask deletes the task with an ID value matches the id parameter sent by the client
@@ -147,6 +158,6 @@ func deleteTask(ctx *gin.Context) {
 	if result.DeletedCount == 0 {
 		ctx.IndentedJSON(http.StatusNotFound, gin.H{"message": "Task not found"})
 	} else {
-		ctx.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
+		ctx.IndentedJSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
 	}
 }
