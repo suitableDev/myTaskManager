@@ -41,11 +41,10 @@ func getTaskByID(ctx *gin.Context) {
 		return
 	}
 
-	var task bson.M
 	result := mongoClient.Database("task_manager").Collection("tasks").FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
 
-	err = result.Decode(&task)
-	if err != nil {
+	var task bson.M
+	if err := result.Decode(&task); err != nil {
 		if err == mongo.ErrNoDocuments {
 			respondWithError(ctx, http.StatusNotFound, "Task not found", err.Error())
 		} else {
@@ -58,36 +57,41 @@ func getTaskByID(ctx *gin.Context) {
 }
 
 // postTask adds a task from JSON received in the request body.
-func postTask(c *gin.Context) {
+func postTask(ctx *gin.Context) {
 	var newTask Task
 	newTask.ID = primitive.NewObjectID()
 	newTask.Created = time.Now().UTC()
 	newTask.Status = false
 
-	if err := c.BindJSON(&newTask); err != nil {
-		respondWithError(c, http.StatusBadRequest, "Invalid JSON", err.Error())
+	if err := ctx.BindJSON(&newTask); err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid JSON", err.Error())
+		return
+	}
+
+	if newTask.Status {
+		respondWithError(ctx, http.StatusBadRequest, "Task cannot be created with true status", "")
 		return
 	}
 
 	if err := validate.Struct(newTask); err != nil {
-		respondWithError(c, http.StatusBadRequest, "Validation error", err.Error())
+		respondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
 		return
 	}
 
 	_, err := mongoClient.Database("task_manager").Collection("tasks").InsertOne(context.TODO(), newTask)
 	if err != nil {
-		respondWithError(c, http.StatusInternalServerError, "Error inserting task", err.Error())
+		respondWithError(ctx, http.StatusInternalServerError, "Error inserting task", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
+	ctx.JSON(http.StatusCreated, gin.H{
 		"message": "Task created successfully",
 		"data":    newTask,
 	})
 }
 
 // updateTask updates the task with an ID value that matches the id parameter sent by the client
-func updateTask(context *gin.Context) {
+func updateTask(ctx *gin.Context) {
 	// id := context.Param("id")
 
 	// var updatedFields struct {
@@ -125,16 +129,24 @@ func updateTask(context *gin.Context) {
 }
 
 // deleteTask deletes the task with an ID value matches the id parameter sent by the client
-func deleteTask(context *gin.Context) {
-	// id := context.Param("id")
+func deleteTask(ctx *gin.Context) {
+	idStr := ctx.Param("id")
 
-	// for i, task := range tasks {
-	// 	if task.ID.String() == id {
-	// 		tasks = append(tasks[:i], tasks[i+1:]...)
-	// 		context.IndentedJSON(http.StatusOK, gin.H{"message": "task deleted"})
-	// 		return
-	// 	}
-	// }
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid ID", err.Error())
+		return
+	}
 
-	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+	result, err := mongoClient.Database("task_manager").Collection("tasks").DeleteOne(context.TODO(), bson.M{"_id": id})
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error deleting task", err.Error())
+		return
+	}
+
+	if result.DeletedCount == 0 {
+		ctx.IndentedJSON(http.StatusNotFound, gin.H{"message": "Task not found"})
+	} else {
+		ctx.JSON(http.StatusOK, gin.H{"message": "Task deleted successfully"})
+	}
 }
