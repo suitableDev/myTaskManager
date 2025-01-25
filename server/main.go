@@ -2,42 +2,38 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-var mongoClient *mongo.Client
 
 func init() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalf("Error loading .env file: %v", err)
 	}
-	if err := connect_to_mongodb(); err != nil {
-		log.Fatal("Could not connect to MongoDB")
+
+	ctx := context.Background()
+	client, err := connectToMongoDB(ctx)
+	if err != nil {
+		log.Fatalf("Could not connect to MongoDB: %v", err)
 	}
+	mongoClient = client
+	log.Println("Connected to MongoDB successfully")
 }
 
 func main() {
 	router := gin.Default()
 	SetupRoutes(router)
-	router.Run("localhost:8080")
-}
-
-func connect_to_mongodb() error {
-	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
-	opts := options.Client().ApplyURI(os.Getenv("MONGO_URI")).SetServerAPIOptions(serverAPI)
-
-	client, err := mongo.Connect(context.TODO(), opts)
-	if err != nil {
-		panic(err)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
-	err = client.Ping(context.TODO(), nil)
-	mongoClient = client
-	return err
+	err := router.Run(fmt.Sprintf("localhost:%s", port))
+	if err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
