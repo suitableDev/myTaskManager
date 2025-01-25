@@ -152,3 +152,20 @@ func deleteTask(ctx *gin.Context) {
 
 	respondWithSuccess(ctx, http.StatusOK, "Task deleted successfully", nil)
 }
+
+// DeleteAllTasks - Deletes all the tasks
+func deleteAllTasks(ctx *gin.Context) {
+	collection := getTaskCollection()
+	result, err := collection.DeleteMany(ctx.Request.Context(), bson.D{{}})
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error deleting all tasks", err.Error())
+		return
+	}
+
+	if result.DeletedCount == 0 {
+		respondWithError(ctx, http.StatusNotFound, "No tasks found to delete", "")
+		return
+	}
+
+	respondWithSuccess(ctx, http.StatusOK, "All tasks deleted successfully", nil)
+}
