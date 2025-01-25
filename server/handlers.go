@@ -6,109 +6,149 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/segmentio/ksuid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var validate = validator.New()
 
-// Tasks slice to seed task data - including dummy data
-var tasks = []Task{
-	{ID: ksuid.New(), Title: "task 1"},
-	{ID: ksuid.New(), Title: "task 2", Status: true},
-}
-
-// getTasks - responds with the list of all tasks as JSON.
-func getTasks(context *gin.Context) {
-	context.IndentedJSON(http.StatusOK, tasks)
-}
-
-// getTaskByID returns task with an ID value matches the id parameter sent by the client
-func getTaskByID(context *gin.Context) {
-	id := context.Param("id")
-
-	for _, a := range tasks {
-		if a.ID.String() == id {
-			context.IndentedJSON(http.StatusOK, a)
-			return
-		}
+// getTasks - Responds with the list of all tasks as JSON
+func getTasks(ctx *gin.Context) {
+	collection := getTaskCollection()
+	cursor, err := collection.Find(ctx.Request.Context(), bson.D{})
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error fetching tasks", err.Error())
+		return
 	}
-	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
-}
+	defer cursor.Close(ctx.Request.Context())
 
-// postTask adds a task from JSON received in the request body.
-func postTask(context *gin.Context) {
-	var newTask Task
-	newTask.ID = ksuid.New()
-	newTask.Created = time.Now().UTC()
-	newTask.Status = false
-
-	if err := context.BindJSON(&newTask); err != nil {
-		respondWithError(context, http.StatusBadRequest, "invalid JSON", err.Error())
+	var tasks []Task
+	if err = cursor.All(ctx.Request.Context(), &tasks); err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error decoding tasks", err.Error())
 		return
 	}
 
-	if newTask.Status {
-		newTask.Status = false
+	ctx.IndentedJSON(http.StatusOK, tasks)
+}
+
+// getTaskByID - Returns the task with the specified ID
+func getTaskByID(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		return
 	}
+
+	var task Task
+	collection := getTaskCollection()
+	err = collection.FindOne(ctx.Request.Context(), bson.M{"_id": id}).Decode(&task)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			respondWithError(ctx, http.StatusNotFound, "Task not found", "")
+		} else {
+			respondWithError(ctx, http.StatusInternalServerError, "Error retrieving task", err.Error())
+		}
+		return
+	}
+
+	ctx.IndentedJSON(http.StatusOK, task)
+}
+
+// postTask - Adds a task from JSON received in the request body
+func postTask(ctx *gin.Context) {
+	var newTask Task
+	if err := ctx.ShouldBindJSON(&newTask); err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid JSON input", err.Error())
+		return
+	}
+
+	newTask.ID = primitive.NewObjectID()
+	newTask.Created = time.Now().UTC()
+	newTask.Status = false // Ensure new tasks are created with `false` status
 
 	if err := validate.Struct(newTask); err != nil {
-		respondWithError(context, http.StatusBadRequest, "validation error", err.Error())
+		respondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
 		return
 	}
 
-	tasks = append(tasks, newTask)
-	context.IndentedJSON(http.StatusCreated, newTask)
+	collection := getTaskCollection()
+	_, err := collection.InsertOne(ctx.Request.Context(), newTask)
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error inserting task", err.Error())
+		return
+	}
+
+	respondWithSuccess(ctx, http.StatusCreated, "Task created successfully", newTask)
 }
 
-// updateTask updates the task with an ID value that matches the id parameter sent by the client
-func updateTask(context *gin.Context) {
-	id := context.Param("id")
+// updateTask - Updates the task with the specified ID
+func updateTask(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		return
+	}
 
 	var updatedFields struct {
 		Title  *string `json:"title" validate:"omitempty,min=1"`
 		Status *bool   `json:"status"`
 	}
-
-	if err := context.BindJSON(&updatedFields); err != nil {
-		respondWithError(context, http.StatusBadRequest, "invalid JSON", err.Error())
+	if err := ctx.ShouldBindJSON(&updatedFields); err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid JSON input", err.Error())
 		return
 	}
 
 	if err := validate.Struct(updatedFields); err != nil {
-		respondWithError(context, http.StatusBadRequest, "validation error", err.Error())
+		respondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
 		return
 	}
 
-	for i, task := range tasks {
-		if task.ID.String() == id {
-
-			if updatedFields.Title != nil {
-				tasks[i].Title = *updatedFields.Title
-			}
-
-			if updatedFields.Status != nil {
-				tasks[i].Status = *updatedFields.Status
-			}
-
-			context.IndentedJSON(http.StatusOK, tasks[i])
-			return
-		}
+	update := bson.M{}
+	if updatedFields.Title != nil {
+		update["title"] = *updatedFields.Title
+	}
+	if updatedFields.Status != nil {
+		update["status"] = *updatedFields.Status
 	}
 
-	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+	collection := getTaskCollection()
+	result, err := collection.UpdateOne(ctx.Request.Context(), bson.M{"_id": id}, bson.M{"$set": update})
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error updating task", err.Error())
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		respondWithError(ctx, http.StatusNotFound, "Task not found", "")
+		return
+	}
+
+	respondWithSuccess(ctx, http.StatusOK, "Task updated successfully", nil)
 }
 
-// deleteTask deletes the task with an ID value matches the id parameter sent by the client
-func deleteTask(context *gin.Context) {
-	id := context.Param("id")
-
-	for i, task := range tasks {
-		if task.ID.String() == id {
-			tasks = append(tasks[:i], tasks[i+1:]...)
-			context.IndentedJSON(http.StatusOK, gin.H{"message": "task deleted"})
-			return
-		}
+// deleteTask - Deletes the task with the specified ID
+func deleteTask(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := primitive.ObjectIDFromHex(idStr)
+	if err != nil {
+		respondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		return
 	}
 
-	context.IndentedJSON(http.StatusNotFound, gin.H{"message": "task not found"})
+	collection := getTaskCollection()
+	result, err := collection.DeleteOne(ctx.Request.Context(), bson.M{"_id": id})
+	if err != nil {
+		respondWithError(ctx, http.StatusInternalServerError, "Error deleting task", err.Error())
+		return
+	}
+
+	if result.DeletedCount == 0 {
+		respondWithError(ctx, http.StatusNotFound, "Task not found", "")
+		return
+	}
+
+	respondWithSuccess(ctx, http.StatusOK, "Task deleted successfully", nil)
 }
