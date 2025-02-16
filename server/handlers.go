@@ -66,6 +66,7 @@ func postTask(ctx *gin.Context) {
 
 	newTask.ID = primitive.NewObjectID()
 	newTask.Created = time.Now().UTC()
+	newTask.Updated = time.Time{}
 	newTask.Status = false // Ensure new tasks are created with `false` status
 
 	if err := validate.Struct(newTask); err != nil {
@@ -93,9 +94,11 @@ func updateTask(ctx *gin.Context) {
 	}
 
 	var updatedFields struct {
-		Title  *string `json:"title" validate:"omitempty,min=1"`
-		Status *bool   `json:"status"`
+		Title   *string    `json:"title" validate:"omitempty,min=1"`
+		Status  *bool      `json:"status"`
+		Updated *time.Time `json:"updated"`
 	}
+
 	if err := ctx.ShouldBindJSON(&updatedFields); err != nil {
 		respondWithError(ctx, http.StatusBadRequest, "Invalid JSON input", err.Error())
 		return
@@ -113,6 +116,7 @@ func updateTask(ctx *gin.Context) {
 	if updatedFields.Status != nil {
 		update["status"] = *updatedFields.Status
 	}
+	update["updated"] = time.Now().UTC()
 
 	collection := getTaskCollection()
 	result, err := collection.UpdateOne(ctx.Request.Context(), bson.M{"_id": id}, bson.M{"$set": update})
