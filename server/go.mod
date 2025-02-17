@@ -1,4 +1,4 @@
-module todo-app/server
+module task-manager/server
 
 go 1.23.2
 

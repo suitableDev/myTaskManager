@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"context"
@@ -10,9 +10,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var mongoClient *mongo.Client
+var MongoClient *mongo.Client
 
-func connectToMongoDB(ctx context.Context) (*mongo.Client, error) {
+func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(os.Getenv("MONGO_URI")).SetServerAPIOptions(serverAPI)
 
@@ -36,11 +36,11 @@ func connectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 
 	fmt.Println("Successfully connected to MongoDB")
 
-	mongoClient = client
+	MongoClient = client
 	return client, nil
 }
 
 // Helper function for Retrieving the Collection
-func getTaskCollection() *mongo.Collection {
-	return mongoClient.Database("task_manager").Collection("tasks")
+func GetTaskCollection() *mongo.Collection {
+	return MongoClient.Database("task_manager").Collection("tasks")
 }

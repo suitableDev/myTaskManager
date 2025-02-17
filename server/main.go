@@ -8,6 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+
+	"task-manager/server/database"
+	"task-manager/server/routes"
 )
 
 func init() {
@@ -17,17 +20,17 @@ func init() {
 	}
 
 	ctx := context.Background()
-	client, err := connectToMongoDB(ctx)
+	client, err := database.ConnectToMongoDB(ctx)
 	if err != nil {
 		log.Fatalf("Could not connect to MongoDB: %v", err)
 	}
-	mongoClient = client
+	database.MongoClient = client
 	log.Println("Connected to MongoDB successfully")
 }
 
 func main() {
 	router := gin.Default()
-	SetupRoutes(router)
+	routes.SetupRoutes(router)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
