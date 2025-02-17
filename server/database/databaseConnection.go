@@ -44,3 +44,7 @@ func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 func GetTaskCollection() *mongo.Collection {
 	return MongoClient.Database("task_manager").Collection("tasks")
 }
+
+func GetUserCollection() *mongo.Collection {
+	return MongoClient.Database("task_manager").Collection("users")
+}

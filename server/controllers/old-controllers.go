@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -15,7 +14,7 @@ import (
 	"task-manager/server/models"
 )
 
-var validate = validator.New()
+// var validate = validator.New()
 
 // getTasks - Responds with the list of all tasks as JSON
 func GetTasks(ctx *gin.Context) {
