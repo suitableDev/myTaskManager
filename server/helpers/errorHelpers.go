@@ -3,7 +3,7 @@ package helper
 import (
 	"github.com/gin-gonic/gin"
 
-	"task-manager/server/models"
+	model "task-manager/server/models"
 )
 
 // respondWithError - Helper function for HTTP error responses
@@ -16,7 +16,7 @@ func RespondWithError(context *gin.Context, code int, message string, details st
 
 // respondWithSuccess - Helper function for HTTP success responses
 func RespondWithSuccess(ctx *gin.Context, code int, message string, data interface{}) {
-	ctx.IndentedJSON(code, models.SuccessResponse{
+	ctx.IndentedJSON(code, model.SuccessResponse{
 		Message: message,
 		Data:    data,
 	})

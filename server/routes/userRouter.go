@@ -1,15 +1,14 @@
 package routes
 
-// import (
-// 	"task-manager/server/controllers"
-// 	"task-manager/server/middleware"
+import (
+	"github.com/gin-gonic/gin"
 
-// 	"github.com/gin-gonic/gin"
-// )
+	controller "task-manager/server/controllers"
+	// "task-manager/server/middleware"
+)
 
-// func UserRoutes(incomingRoutes *gin.Engine) {
-// 	// incomingRoutes.Use(middleware.Authenticate())
-// 	// incomingRoutes.GET("/users", controllers.GetUsers())
-// 	// incomingRoutes.GET("/users/:user_id", controllers.GetUser())
-
-// }
+func UserRoutes(incomingRoutes *gin.Engine) {
+	// incomingRoutes.Use(middleware.Authenticate())
+	incomingRoutes.GET("/users", controller.GetUsers())
+	incomingRoutes.GET("/users/:user_id", controller.GetUser())
+}

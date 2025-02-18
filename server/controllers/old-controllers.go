@@ -1,4 +1,4 @@
-package controllers
+package controller
 
 import (
 	"net/http"
@@ -9,12 +9,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"task-manager/server/database"
+	database "task-manager/server/database"
 	helper "task-manager/server/helpers"
-	"task-manager/server/models"
+	model "task-manager/server/models"
 )
-
-// var validate = validator.New()
 
 // getTasks - Responds with the list of all tasks as JSON
 func GetTasks(ctx *gin.Context) {
@@ -26,7 +24,7 @@ func GetTasks(ctx *gin.Context) {
 	}
 	defer cursor.Close(ctx.Request.Context())
 
-	var tasks []models.Task
+	var tasks []model.Task
 	if err = cursor.All(ctx.Request.Context(), &tasks); err != nil {
 		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error decoding tasks", err.Error())
 		return
@@ -44,7 +42,7 @@ func GetTaskByID(ctx *gin.Context) {
 		return
 	}
 
-	var task models.Task
+	var task model.Task
 	collection := database.GetTaskCollection()
 	err = collection.FindOne(ctx.Request.Context(), bson.M{"_id": id}).Decode(&task)
 	if err != nil {
@@ -61,7 +59,7 @@ func GetTaskByID(ctx *gin.Context) {
 
 // postTask - Adds a task from JSON received in the request body
 func PostTask(ctx *gin.Context) {
-	var newTask models.Task
+	var newTask model.Task
 	if err := ctx.ShouldBindJSON(&newTask); err != nil {
 		helper.RespondWithError(ctx, http.StatusBadRequest, "Invalid JSON input", err.Error())
 		return
