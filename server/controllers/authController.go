@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	database "task-manager/server/database"
 	helper "task-manager/server/helpers"
 	model "task-manager/server/models"
 )
@@ -43,9 +44,10 @@ func VerifyPassword(userPassword string, providedPassword string) (bool, string)
 func Signup() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+
 		var user model.User
 
-		defer cancel()
 		if err := c.BindJSON(&user); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -57,13 +59,13 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 
-		password := HashPassword(*user.Password)
-		user.Password = &password
+		// Get the user collection properly initialized
+		userCollection := database.GetUserCollection()
 
 		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 		if err != nil {
 			log.Panic(err, "EMAIL")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 			return
 		}
 
@@ -72,8 +74,11 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 
-		user.CreatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-		user.UpdatedAt, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+		password := HashPassword(*user.Password)
+		user.Password = &password
+
+		user.CreatedAt = time.Now()
+		user.UpdatedAt = time.Now()
 		user.ID = primitive.NewObjectID()
 		user.UserId = new(string)
 		*user.UserId = user.ID.Hex()
@@ -89,8 +94,7 @@ func Signup() gin.HandlerFunc {
 
 		resultInsertionNumber, insertErr := userCollection.InsertOne(ctx, user)
 		if insertErr != nil {
-			msg := "User item was not created"
-			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "User item was not created"}) // Generic message
 			return
 		}
 
