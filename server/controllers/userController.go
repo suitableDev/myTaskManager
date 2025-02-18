@@ -19,6 +19,7 @@ import (
 
 var userCollection *mongo.Collection = database.GetUserCollection()
 
+// getUsers - Responds with the list of all user as JSON
 func GetUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
@@ -63,6 +64,7 @@ func GetUsers() gin.HandlerFunc {
 	}
 }
 
+// getUser - Responds with a single user as JSON
 func GetUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId := c.Param("user_id")

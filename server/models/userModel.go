@@ -3,6 +3,7 @@ package model
 import (
 	"time"
 
+	"github.com/golang-jwt/jwt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -17,4 +18,12 @@ type User struct {
 	RefreshToken *string            `json:"refresh_token"`
 	CreatedAt    time.Time          `json:"created"`
 	UpdatedAt    time.Time          `json:"updated"`
+}
+
+type SignedDetails struct {
+	Email    string
+	Username string
+	Uid      string
+	UserType string
+	jwt.StandardClaims
 }
