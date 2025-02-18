@@ -9,14 +9,20 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
-	"task-manager/server/database"
-	"task-manager/server/routes"
+	database "task-manager/server/database"
+	helper "task-manager/server/helpers"
+	routes "task-manager/server/routes"
 )
 
 func init() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	helper.SECRET_KEY = os.Getenv("SECRET_KEY")
+	if helper.SECRET_KEY == "" {
+		log.Panic("SECRET_KEY environment variable is not set")
 	}
 
 	ctx := context.Background()
@@ -31,6 +37,7 @@ func init() {
 func main() {
 	router := gin.Default()
 	routes.SetupRoutes(router)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

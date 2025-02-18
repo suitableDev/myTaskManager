@@ -23,7 +23,7 @@ var validate = validator.New()
 func HashPassword(password string) string {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	if err != nil {
-		log.Panic(err)
+		log.Panic(err, "HASH")
 	}
 	return string(bytes)
 }
@@ -62,7 +62,7 @@ func Signup() gin.HandlerFunc {
 
 		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 		if err != nil {
-			log.Panic(err)
+			log.Panic(err, "EMAIL")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}

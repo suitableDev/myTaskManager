@@ -3,7 +3,6 @@ package helper
 import (
 	"context"
 	"log"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -17,18 +16,12 @@ import (
 )
 
 var userCollection *mongo.Collection = database.GetUserCollection()
-var SECRET_KEY string = os.Getenv("SECRET_KEY")
+var SECRET_KEY string
 
 const (
 	AccessTokenExpiry  = 24
 	RefreshTokenExpiry = 128
 )
-
-func init() {
-	if SECRET_KEY == "" {
-		log.Panic("SECRET_KEY environment variable is not set")
-	}
-}
 
 // GenerateAllTokens generates both access and refresh tokens
 func GenerateAllTokens(email, userName, userType, uid string) (string, string, error) {

@@ -12,6 +12,7 @@ import (
 
 var MongoClient *mongo.Client
 
+// ConnectToMongoDB establishes the connection to the MongoDB database
 func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(os.Getenv("MONGO_URI")).SetServerAPIOptions(serverAPI)
@@ -40,11 +41,18 @@ func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 	return client, nil
 }
 
-// Helper function for Retrieving the Collection
+// GetTaskCollection retrieves the "tasks" collection from the database
 func GetTaskCollection() *mongo.Collection {
+	if MongoClient == nil {
+		return nil
+	}
 	return MongoClient.Database("task_manager").Collection("tasks")
 }
 
+// GetUserCollection retrieves the "users" collection from the database
 func GetUserCollection() *mongo.Collection {
+	if MongoClient == nil {
+		return nil
+	}
 	return MongoClient.Database("task_manager").Collection("users")
 }

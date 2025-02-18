@@ -13,5 +13,5 @@ func SetupRoutes(router *gin.Engine) {
 	router.POST("/tasks", controller.PostTask)
 	router.PUT("/tasks/:id", controller.UpdateTask)
 	router.DELETE("/tasks/:id", controller.DeleteTask)
-	router.DELETE("/tasks/", controller.DeleteAllTasks)
+	router.DELETE("/tasks", controller.DeleteAllTasks)
 }
