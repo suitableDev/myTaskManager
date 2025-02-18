@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -23,7 +24,6 @@ const (
 	RefreshTokenExpiry = 128
 )
 
-// GenerateAllTokens generates both access and refresh tokens
 func GenerateAllTokens(email, userName, userType, uid string) (string, string, error) {
 	claims := &model.SignedDetails{
 		Email:    email,
@@ -56,7 +56,6 @@ func GenerateAllTokens(email, userName, userType, uid string) (string, string, e
 	return token, refreshToken, nil
 }
 
-// ValidateToken validates the given token and returns the claims
 func ValidateToken(signedToken string) (claims *model.SignedDetails, msg string) {
 	token, err := jwt.ParseWithClaims(
 		signedToken,
@@ -81,7 +80,6 @@ func ValidateToken(signedToken string) (claims *model.SignedDetails, msg string)
 	return claims, ""
 }
 
-// UpdateAllTokens updates the tokens and timestamp in the database
 func UpdateAllTokens(signedToken, signedRefreshToken, userId string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -97,10 +95,23 @@ func UpdateAllTokens(signedToken, signedRefreshToken, userId string) error {
 	filter := bson.M{"user_id": userId}
 	opt := options.UpdateOptions{Upsert: &upsert}
 
+	log.Printf("Updating tokens for user: %v", userId)
+	log.Printf("filter: %v", filter)
+	log.Printf("updateObj: %v", updateObj)
+
+	userCollection := database.GetUserCollection()
+
+	if userCollection == nil {
+		log.Printf("Error: userCollection is nil")
+		return fmt.Errorf("userCollection is nil")
+	}
+
 	_, err := userCollection.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: updateObj}}, &opt)
 	if err != nil {
 		log.Printf("failed to update tokens for user %s: %v", userId, err)
 		return err
 	}
+
+	log.Printf("Successfully updated tokens for user %s", userId)
 	return nil
 }

@@ -104,7 +104,7 @@ func Signup() gin.HandlerFunc {
 
 func Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
 		var user model.User
@@ -112,6 +112,12 @@ func Login() gin.HandlerFunc {
 
 		if err := c.BindJSON(&user); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		userCollection := database.GetUserCollection()
+		if userCollection == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "userCollection is nil"})
 			return
 		}
 
@@ -132,17 +138,31 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		token, refreshToken, _ := helper.GenerateAllTokens(*foundUser.Email, *foundUser.Password, *foundUser.Username, *foundUser.UserType)
-
-		if foundUser.UserId != nil {
-			helper.UpdateAllTokens(token, refreshToken, *foundUser.UserId)
-		} else {
-			log.Panic("UserId is nil")
+		if foundUser.UserId == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "UserId is nil"})
+			return
 		}
 
-		err = userCollection.FindOne(ctx, bson.M{"user_id": foundUser.ID}).Decode(&foundUser)
+		token, refreshToken, err := helper.GenerateAllTokens(*foundUser.Email, *foundUser.Username, *foundUser.UserType, *foundUser.UserId)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated user"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens: " + err.Error()}) // Include error
+			return
+		}
+
+		err = helper.UpdateAllTokens(token, refreshToken, *foundUser.UserId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update tokens: " + err.Error()}) // Include error
+			return
+		}
+
+		if foundUser.UserId == nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "UserId is nil after token update"})
+			return
+		}
+
+		err = userCollection.FindOne(ctx, bson.M{"user_id": *foundUser.UserId}).Decode(&foundUser) // Correct query
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated user: " + err.Error()}) // Include error
 			return
 		}
 

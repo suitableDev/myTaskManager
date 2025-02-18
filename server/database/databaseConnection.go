@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 
 var MongoClient *mongo.Client
 
-// ConnectToMongoDB establishes the connection to the MongoDB database
 func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 	opts := options.Client().ApplyURI(os.Getenv("MONGO_URI")).SetServerAPIOptions(serverAPI)
@@ -35,7 +35,7 @@ func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 		return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
 	}
 
-	fmt.Println("Successfully connected to MongoDB")
+	log.Println("Connected to MongoDB successfully")
 
 	MongoClient = client
 	return client, nil
@@ -44,6 +44,7 @@ func ConnectToMongoDB(ctx context.Context) (*mongo.Client, error) {
 // GetTaskCollection retrieves the "tasks" collection from the database
 func GetTaskCollection() *mongo.Collection {
 	if MongoClient == nil {
+		log.Println("MongoDB client is not initialized. Please ensure ConnectToMongoDB is successful.TASK_COLLECTION")
 		return nil
 	}
 	return MongoClient.Database("task_manager").Collection("tasks")
@@ -52,6 +53,7 @@ func GetTaskCollection() *mongo.Collection {
 // GetUserCollection retrieves the "users" collection from the database
 func GetUserCollection() *mongo.Collection {
 	if MongoClient == nil {
+		log.Println("MongoDB client is not initialized. Please ensure ConnectToMongoDB is successful.USER_COLLECTION")
 		return nil
 	}
 	return MongoClient.Database("task_manager").Collection("users")
