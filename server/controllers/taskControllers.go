@@ -57,6 +57,36 @@ func GetTaskByID(ctx *gin.Context) {
 	ctx.IndentedJSON(http.StatusOK, task)
 }
 
+// GetTasksByUser - Returns all tasks for a specific user
+func GetTasksByUser(ctx *gin.Context) {
+	username, _ := ctx.Get("username") // Get the username from the context (set by your middleware)
+
+	userUsername, okUsername := username.(string)
+
+	if !okUsername {
+		helper.RespondWithError(ctx, http.StatusInternalServerError, "Internal Server Error", "Invalid user details")
+		return
+	}
+
+	collection := database.GetTaskCollection()
+
+	// Find all tasks where the "User" field matches the logged-in user's username
+	cursor, err := collection.Find(ctx.Request.Context(), bson.M{"User": userUsername})
+	if err != nil {
+		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error fetching tasks", err.Error())
+		return
+	}
+	defer cursor.Close(ctx.Request.Context())
+
+	var tasks []model.Task
+	if err = cursor.All(ctx.Request.Context(), &tasks); err != nil {
+		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error decoding tasks", err.Error())
+		return
+	}
+
+	ctx.IndentedJSON(http.StatusOK, tasks)
+}
+
 // postTask - Adds a task from JSON received in the request body
 func PostTask(ctx *gin.Context) {
 	var newTask model.Task
@@ -65,10 +95,23 @@ func PostTask(ctx *gin.Context) {
 		return
 	}
 
+	username, _ := ctx.Get("username")
+	uid, _ := ctx.Get("uid")
+
+	userUsername, okUsername := username.(string)
+	userId, okUid := uid.(string)
+
+	if !okUsername || !okUid {
+		helper.RespondWithError(ctx, http.StatusInternalServerError, "Internal Server Error", "Invalid user details")
+		return
+	}
+
+	newTask.User = userUsername
+	newTask.UserId = userId
 	newTask.ID = primitive.NewObjectID()
 	newTask.Created = time.Now().UTC()
 	newTask.Updated = time.Time{}
-	newTask.Status = false // Ensure new tasks are created with `false` status
+	newTask.Status = false
 
 	if err := validate.Struct(newTask); err != nil {
 		helper.RespondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
@@ -95,7 +138,7 @@ func UpdateTask(ctx *gin.Context) {
 	}
 
 	var updatedFields struct {
-		Title   *string    `json:"title" validate:"omitempty,min=1"`
+		Title   *string    `json:"title" validate:"omitempty,min=1,max=255"`
 		Status  *bool      `json:"status"`
 		Updated *time.Time `json:"updated"`
 	}
