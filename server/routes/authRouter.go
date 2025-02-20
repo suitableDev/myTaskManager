@@ -1,12 +1,16 @@
 package routes
 
 import (
-	controller "task-manager/server/controllers"
-
 	"github.com/gin-gonic/gin"
+
+	controller "task-manager/server/controllers"
+	middleware "task-manager/server/middleware"
 )
 
 func AuthRoutes(incomingRoutes *gin.Engine) {
-	incomingRoutes.POST("users/signup", controller.Signup())
-	incomingRoutes.POST("users/login", controller.Login())
+	signupRateLimiter := middleware.RateLimitMiddleware(middleware.SignupLimiter)
+	loginRateLimiter := middleware.RateLimitMiddleware(middleware.LoginLimiter)
+
+	incomingRoutes.POST("users/signup", signupRateLimiter, controller.Signup())
+	incomingRoutes.POST("users/login", loginRateLimiter, controller.Login())
 }
