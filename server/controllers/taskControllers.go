@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -8,89 +9,142 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	database "task-manager/server/database"
 	helper "task-manager/server/helpers"
 	model "task-manager/server/models"
 )
 
-// getTasks - Responds with the list of all tasks as JSON
-func GetTasks(ctx *gin.Context) {
-	collection := database.GetTaskCollection()
-	cursor, err := collection.Find(ctx.Request.Context(), bson.D{})
-	if err != nil {
-		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error fetching tasks", err.Error())
+// Helper function to handle context setup -- keepng it here for ease
+func getContextWithTimeout() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 10*time.Second)
+}
+
+// GetTasks - Retrieves all tasks
+func GetTasks(c *gin.Context) {
+	userID, username, valid := helper.GetUserDetails(c)
+	if !valid {
+		helper.RespondWithError(c, http.StatusUnauthorized, "User not authorized", "UID or Username not found in context")
 		return
 	}
-	defer cursor.Close(ctx.Request.Context())
+
+	ctx, cancel := getContextWithTimeout()
+	defer cancel()
+
+	taskCollection := database.GetTaskCollection()
+	filter := bson.M{"userid": userID}
+
+	opts := options.Find().SetSort(bson.D{{Key: "created", Value: -1}})
+
+	cursor, err := taskCollection.Find(ctx, filter, opts)
+	if err != nil {
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error fetching tasks", err.Error())
+		return
+	}
+	defer cursor.Close(ctx)
 
 	var tasks []model.Task
-	if err = cursor.All(ctx.Request.Context(), &tasks); err != nil {
-		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error decoding tasks", err.Error())
+	if err = cursor.All(ctx, &tasks); err != nil {
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error decoding tasks", err.Error())
 		return
 	}
 
-	ctx.IndentedJSON(http.StatusOK, tasks)
+	if len(tasks) == 0 {
+		helper.RespondWithSuccess(c, http.StatusOK, "No tasks found for "+username, []model.Task{})
+		return
+	}
+
+	helper.RespondWithSuccess(c, http.StatusOK, "Tasks for "+username, tasks)
 }
 
-// getTaskByID - Returns the task with the specified ID
-func GetTaskByID(ctx *gin.Context) {
-	idStr := ctx.Param("id")
-	id, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+// GetTaskByID - Retrieves a single task with the specified ID
+func GetTaskByID(c *gin.Context) {
+	userID, username, valid := helper.GetUserDetails(c)
+	if !valid {
+		helper.RespondWithError(c, http.StatusUnauthorized, "User not authorized", "UID or Username not found in context")
 		return
 	}
+
+	taskId := c.Param("id")
+	if taskId == "" {
+		helper.RespondWithError(c, http.StatusBadRequest, "Task ID is required", "No ID provided in the request")
+		return
+	}
+
+	objId, err := primitive.ObjectIDFromHex(taskId)
+	if err != nil {
+		helper.RespondWithError(c, http.StatusBadRequest, "Invalid task ID format", err.Error())
+		return
+	}
+
+	ctx, cancel := getContextWithTimeout()
+	defer cancel()
+
+	taskCollection := database.GetTaskCollection()
+	filter := bson.M{"_id": objId, "userid": userID}
 
 	var task model.Task
-	collection := database.GetTaskCollection()
-	err = collection.FindOne(ctx.Request.Context(), bson.M{"_id": id}).Decode(&task)
+	err = taskCollection.FindOne(ctx, filter).Decode(&task)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			helper.RespondWithError(ctx, http.StatusNotFound, "Task not found", "")
-		} else {
-			helper.RespondWithError(ctx, http.StatusInternalServerError, "Error retrieving task", err.Error())
+			helper.RespondWithError(c, http.StatusNotFound, "Task not found", "No task found for the specified ID and user "+username)
+			return
 		}
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error fetching task", err.Error())
 		return
 	}
 
-	ctx.IndentedJSON(http.StatusOK, task)
+	helper.RespondWithSuccess(c, http.StatusOK, "Task for "+username, task)
 }
 
-// postTask - Adds a task from JSON received in the request body
-func PostTask(ctx *gin.Context) {
+// PostTask - Adds a task from JSON received in the request body
+func PostTask(c *gin.Context) {
 	var newTask model.Task
-	if err := ctx.ShouldBindJSON(&newTask); err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Invalid JSON input", err.Error())
+	if err := c.ShouldBindJSON(&newTask); err != nil {
+		helper.RespondWithError(c, http.StatusBadRequest, "Invalid JSON input", err.Error())
+		return
+	}
+
+	userID, username, valid := helper.GetUserDetails(c)
+	if !valid {
+		helper.RespondWithError(c, http.StatusInternalServerError, "Invalid user details", "Failed to get username or UID")
 		return
 	}
 
 	newTask.ID = primitive.NewObjectID()
+	newTask.UserID = userID
+	newTask.Username = username
 	newTask.Created = time.Now().UTC()
 	newTask.Updated = time.Time{}
-	newTask.Status = false // Ensure new tasks are created with `false` status
+	newTask.Status = false
 
 	if err := validate.Struct(newTask); err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
+		helper.RespondWithError(c, http.StatusBadRequest, "Validation error", err.Error())
 		return
 	}
 
 	collection := database.GetTaskCollection()
-	_, err := collection.InsertOne(ctx.Request.Context(), newTask)
-	if err != nil {
-		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error inserting task", err.Error())
+	if _, err := collection.InsertOne(c.Request.Context(), newTask); err != nil {
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error inserting task", err.Error())
 		return
 	}
 
-	helper.RespondWithSuccess(ctx, http.StatusCreated, "Task created successfully", newTask)
+	helper.RespondWithSuccess(c, http.StatusCreated, "Task created successfully", newTask)
 }
 
-// updateTask - Updates the task with the specified ID
-func UpdateTask(ctx *gin.Context) {
-	idStr := ctx.Param("id")
+// UpdateTask - Updates the task with the specified ID
+func UpdateTask(c *gin.Context) {
+	userID, username, valid := helper.GetUserDetails(c)
+	if !valid {
+		helper.RespondWithError(c, http.StatusUnauthorized, "User not authorized", "UID or Username not found in context")
+		return
+	}
+
+	idStr := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idStr)
 	if err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		helper.RespondWithError(c, http.StatusBadRequest, "Invalid ID format", err.Error())
 		return
 	}
 
@@ -100,13 +154,13 @@ func UpdateTask(ctx *gin.Context) {
 		Updated *time.Time `json:"updated"`
 	}
 
-	if err := ctx.ShouldBindJSON(&updatedFields); err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Invalid JSON input", err.Error())
+	if err := c.ShouldBindJSON(&updatedFields); err != nil {
+		helper.RespondWithError(c, http.StatusBadRequest, "Invalid JSON input", err.Error())
 		return
 	}
 
 	if err := validate.Struct(updatedFields); err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Validation error", err.Error())
+		helper.RespondWithError(c, http.StatusBadRequest, "Validation error", err.Error())
 		return
 	}
 
@@ -120,57 +174,73 @@ func UpdateTask(ctx *gin.Context) {
 	update["updated"] = time.Now().UTC()
 
 	collection := database.GetTaskCollection()
-	result, err := collection.UpdateOne(ctx.Request.Context(), bson.M{"_id": id}, bson.M{"$set": update})
+	filter := bson.M{"_id": id, "userid": userID}
+
+	result, err := collection.UpdateOne(c.Request.Context(), filter, bson.M{"$set": update})
 	if err != nil {
-		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error updating task", err.Error())
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error updating task", err.Error())
 		return
 	}
 
 	if result.MatchedCount == 0 {
-		helper.RespondWithError(ctx, http.StatusNotFound, "Task not found", "")
+		helper.RespondWithError(c, http.StatusNotFound, "Task not found", "No task found for the specified ID and user "+username)
 		return
 	}
 
-	helper.RespondWithSuccess(ctx, http.StatusOK, "Task updated successfully", nil)
+	helper.RespondWithSuccess(c, http.StatusOK, "Task updated successfully for "+username, update)
 }
 
-// deleteTask - Deletes the task with the specified ID
-func DeleteTask(ctx *gin.Context) {
-	idStr := ctx.Param("id")
+// DeleteTask - Deletes the task with the specified ID
+func DeleteTask(c *gin.Context) {
+	userID, _, valid := helper.GetUserDetails(c)
+	if !valid {
+		helper.RespondWithError(c, http.StatusUnauthorized, "User not authorized", "UID not found in context")
+		return
+	}
+
+	idStr := c.Param("id")
 	id, err := primitive.ObjectIDFromHex(idStr)
 	if err != nil {
-		helper.RespondWithError(ctx, http.StatusBadRequest, "Invalid ID format", err.Error())
+		helper.RespondWithError(c, http.StatusBadRequest, "Invalid ID format", err.Error())
 		return
 	}
 
 	collection := database.GetTaskCollection()
-	result, err := collection.DeleteOne(ctx.Request.Context(), bson.M{"_id": id})
+	filter := bson.M{"_id": id, "userid": userID}
+	result, err := collection.DeleteOne(c.Request.Context(), filter)
 	if err != nil {
-		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error deleting task", err.Error())
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error deleting task", err.Error())
 		return
 	}
 
 	if result.DeletedCount == 0 {
-		helper.RespondWithError(ctx, http.StatusNotFound, "Task not found", "")
+		helper.RespondWithError(c, http.StatusNotFound, "Task not found", "No task found for the specified ID and user")
 		return
 	}
 
-	helper.RespondWithSuccess(ctx, http.StatusOK, "Task deleted successfully", nil)
+	helper.RespondWithSuccess(c, http.StatusOK, "Task deleted successfully", nil)
 }
 
 // DeleteAllTasks - Deletes all the tasks
-func DeleteAllTasks(ctx *gin.Context) {
+func DeleteAllTasks(c *gin.Context) {
+	userID, _, valid := helper.GetUserDetails(c)
+	if !valid {
+		helper.RespondWithError(c, http.StatusUnauthorized, "User not authorized", "UID not found in context")
+		return
+	}
+
 	collection := database.GetTaskCollection()
-	result, err := collection.DeleteMany(ctx.Request.Context(), bson.D{{}})
+	filter := bson.M{"userid": userID}
+	result, err := collection.DeleteMany(c.Request.Context(), filter)
 	if err != nil {
-		helper.RespondWithError(ctx, http.StatusInternalServerError, "Error deleting all tasks", err.Error())
+		helper.RespondWithError(c, http.StatusInternalServerError, "Error deleting all tasks", err.Error())
 		return
 	}
 
 	if result.DeletedCount == 0 {
-		helper.RespondWithError(ctx, http.StatusNotFound, "No tasks found to delete", "")
+		helper.RespondWithError(c, http.StatusNotFound, "No tasks found", "No tasks found for the user to delete")
 		return
 	}
 
-	helper.RespondWithSuccess(ctx, http.StatusOK, "All tasks deleted successfully", nil)
+	helper.RespondWithSuccess(c, http.StatusOK, "All tasks deleted successfully", nil)
 }

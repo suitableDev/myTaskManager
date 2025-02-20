@@ -80,7 +80,7 @@ func ValidateToken(signedToken string) (claims *model.SignedDetails, msg string)
 	return claims, ""
 }
 
-func UpdateAllTokens(signedToken, signedRefreshToken, userId string) error {
+func UpdateAllTokens(signedToken, signedRefreshToken, UserID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -92,10 +92,10 @@ func UpdateAllTokens(signedToken, signedRefreshToken, userId string) error {
 	}
 
 	upsert := true
-	filter := bson.M{"user_id": userId}
+	filter := bson.M{"userid": UserID}
 	opt := options.UpdateOptions{Upsert: &upsert}
 
-	log.Printf("Updating tokens for user: %v", userId)
+	log.Printf("Updating tokens for user: %v", UserID)
 	log.Printf("filter: %v", filter)
 	log.Printf("updateObj: %v", updateObj)
 
@@ -108,10 +108,10 @@ func UpdateAllTokens(signedToken, signedRefreshToken, userId string) error {
 
 	_, err := userCollection.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: updateObj}}, &opt)
 	if err != nil {
-		log.Printf("failed to update tokens for user %s: %v", userId, err)
+		log.Printf("failed to update tokens for user %s: %v", UserID, err)
 		return err
 	}
 
-	log.Printf("Successfully updated tokens for user %s", userId)
+	log.Printf("Successfully updated tokens for user %s", UserID)
 	return nil
 }
