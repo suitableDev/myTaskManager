@@ -17,7 +17,7 @@ var (
 func RateLimitMiddleware(rateLimiter *ratelimit.Bucket) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if rateLimiter.TakeAvailable(1) == 0 {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Too Many Requests"})
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate limit exceeded"})
 			return
 		}
 		c.Next()

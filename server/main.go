@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time" // Import time
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -13,22 +14,24 @@ import (
 	"task-manager/server/routes"
 )
 
-func init() {
+func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	client, err := database.ConnectToMongoDB(ctx)
 	if err != nil {
 		log.Fatalf("Could not connect to MongoDB: %v", err)
 	}
+	defer client.Disconnect(ctx)
+
 	database.MongoClient = client
 	log.Println("Connected to MongoDB successfully")
-}
 
-func main() {
 	router := gin.Default()
 
 	routes.AuthRoutes(router)
@@ -39,7 +42,8 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	err := router.Run(fmt.Sprintf("0.0.0.0:%s", port))
+
+	err = router.Run(fmt.Sprintf("0.0.0.0:%s", port))
 	if err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

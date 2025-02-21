@@ -14,7 +14,7 @@ func Authenticate() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "No Authorization header provided or invalid format"})
+			helper.RespondWithError(c, http.StatusUnauthorized, "No Authorization header provided or invalid format", "")
 			c.Abort()
 			return
 		}
@@ -23,7 +23,7 @@ func Authenticate() gin.HandlerFunc {
 
 		claims, err := helper.ValidateToken(clientToken)
 		if err != "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err})
+			helper.RespondWithError(c, http.StatusInternalServerError, "Invalid token", err)
 			c.Abort()
 			return
 		}

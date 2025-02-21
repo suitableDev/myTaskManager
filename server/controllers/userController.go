@@ -2,13 +2,11 @@ package controller
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -19,39 +17,39 @@ import (
 
 var userCollection *mongo.Collection = database.GetUserCollection()
 
-// getUsers - Responds with the list of all user as JSON
+// GetUsers - Responds with the list of all users as JSON
 func GetUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
-			log.Printf("CheckUserType error: %v", err)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			helper.RespondWithError(c, http.StatusBadRequest, "Unauthorized", err.Error())
 			return
 		}
 
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
-		recordPerPage, err := strconv.Atoi(c.Query("recordPerPage"))
-		if err != nil || recordPerPage < 1 {
-			recordPerPage = 10
-		}
-		page, err := strconv.Atoi(c.Query("page"))
-		if err != nil || page < 1 {
-			page = 1
-		}
+		recordPerPage := 10
+		page := 1
 
-		startIndex := (page - 1) * recordPerPage
-		if c.Query("startIndex") != "" {
-			startIndex, err = strconv.Atoi(c.Query("startIndex"))
-			if err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid startIndex"})
-				return
+		if rpp := c.Query("recordPerPage"); rpp != "" {
+			rppInt, err := strconv.Atoi(rpp)
+			if err == nil && rppInt > 0 {
+				recordPerPage = rppInt
 			}
 		}
 
+		if p := c.Query("page"); p != "" {
+			pInt, err := strconv.Atoi(p)
+			if err == nil && pInt > 0 {
+				page = pInt
+			}
+		}
+
+		startIndex := (page - 1) * recordPerPage
+
 		matchStage := bson.D{{Key: "$match", Value: bson.D{{}}}}
 		groupStage := bson.D{{Key: "$group", Value: bson.D{
-			{Key: "_id", Value: bson.D{{Key: "_id", Value: "null"}}},
+			{Key: "_id", Value: "null"},
 			{Key: "total_count", Value: bson.D{{Key: "$sum", Value: 1}}},
 			{Key: "data", Value: bson.D{{Key: "$push", Value: "$$ROOT"}}}}}}
 		projectStage := bson.D{
@@ -62,46 +60,46 @@ func GetUsers() gin.HandlerFunc {
 
 		result, err := userCollection.Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, projectStage})
 		if err != nil {
-			log.Printf("MongoDB Aggregate Error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occurred while listing user items"})
+			helper.RespondWithError(c, http.StatusInternalServerError, "Database error", err.Error())
 			return
 		}
+		defer result.Close(ctx)
 
 		var allusers []bson.M
 		if err = result.All(ctx, &allusers); err != nil {
-			log.Printf("MongoDB Result Error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occurred while processing user data"})
+			helper.RespondWithError(c, http.StatusInternalServerError, "Database error", err.Error())
 			return
 		}
 
 		if len(allusers) == 0 {
-			c.JSON(http.StatusOK, gin.H{"message": "No users found"})
+			helper.RespondWithSuccess(c, http.StatusOK, "No users found", []interface{}{}) // Return empty array for consistency
 			return
 		}
 
-		c.JSON(http.StatusOK, allusers[0])
+		helper.RespondWithSuccess(c, http.StatusOK, "Users retrieved successfully", allusers[0])
 	}
 }
 
-// getUser - Responds with a single user as JSON
+// GetUser - Responds with a single user as JSON
 func GetUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		UserID := c.Param("userid")
 
 		if err := helper.MatchUserTypeToUid(c, UserID); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			helper.RespondWithError(c, http.StatusBadRequest, "Unauthorized", err.Error())
 			return
 		}
 
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
 
 		var user model.User
 		err := userCollection.FindOne(ctx, bson.M{"userid": UserID}).Decode(&user)
-		defer cancel()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			helper.RespondWithError(c, http.StatusInternalServerError, "User not found", err.Error())
 			return
 		}
-		c.JSON(http.StatusOK, user)
+
+		helper.RespondWithSuccess(c, http.StatusOK, "User retrieved successfully", user)
 	}
 }
