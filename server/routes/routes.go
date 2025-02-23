@@ -7,8 +7,20 @@ import (
 	middleware "task-manager/server/middleware"
 )
 
-// SetupRoutes configures the routes and binds them to the corresponding handler functions
 func SetupRoutes(router *gin.Engine) {
+	// Authentication routes
+	signupRateLimiter := middleware.RateLimitMiddleware(middleware.SignupLimiter)
+	loginRateLimiter := middleware.RateLimitMiddleware(middleware.LoginLimiter)
+
+	router.POST("users/signup", signupRateLimiter, controller.Signup())
+	router.POST("users/login", loginRateLimiter, controller.Login())
+
+	// User routes (protected with authentication middleware)
+	router.Use(middleware.Authenticate())
+	router.GET("/users", controller.GetUsers())
+	router.GET("/users/:userid", controller.GetUser())
+
+	// Task routes
 	taskCreateLimiter := middleware.RateLimitMiddleware(middleware.CreateLimiter)
 	taskDeleteLimiter := middleware.RateLimitMiddleware(middleware.DeleteLimiter)
 
