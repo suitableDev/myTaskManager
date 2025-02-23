@@ -4,20 +4,27 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	database "task-manager/server/database"
 	model "task-manager/server/models"
 )
 
-var userCollection *mongo.Collection = database.GetUserCollection()
-var SECRET_KEY string
+func HashKey() string {
+	secretKey := os.Getenv("SECRET_KEY")
+	if secretKey == "" {
+		log.Fatalf("SECRET_KEY is not set in the .env file")
+	}
+	return secretKey
+}
+
+var hashKey = HashKey()
 
 const (
 	AccessTokenExpiry  = 24
@@ -41,13 +48,13 @@ func GenerateAllTokens(email, userName, userType, uid string) (string, string, e
 		},
 	}
 
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(SECRET_KEY))
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(hashKey))
 	if err != nil {
 		log.Printf("error generating access token: %v", err)
 		return "", "", err
 	}
 
-	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(SECRET_KEY))
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(hashKey))
 	if err != nil {
 		log.Printf("error generating refresh token: %v", err)
 		return "", "", err
@@ -61,7 +68,7 @@ func ValidateToken(signedToken string) (claims *model.SignedDetails, msg string)
 		signedToken,
 		&model.SignedDetails{},
 		func(token *jwt.Token) (interface{}, error) {
-			return []byte(SECRET_KEY), nil
+			return []byte(hashKey), nil
 		},
 	)
 
