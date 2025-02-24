@@ -33,6 +33,7 @@ func VerifyPassword(userPassword string, providedPassword string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(providedPassword), []byte(userPassword)) == nil
 }
 
+// Signup - create a new user
 func Signup() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
@@ -74,7 +75,7 @@ func Signup() gin.HandlerFunc {
 		user.UserID = new(string)
 		*user.UserID = user.ID.Hex()
 
-		token, refreshToken, err := helper.GenerateAllTokens(*user.Email, *user.Username, *user.UserType, *user.UserID)
+		token, refreshToken, _, _, err := helper.GenerateAllTokens(*user.Email, *user.Username, *user.UserType, *user.UserID)
 		if err != nil {
 			helper.RespondWithError(c, http.StatusInternalServerError, "Failed to generate tokens", err.Error())
 			return
@@ -83,16 +84,20 @@ func Signup() gin.HandlerFunc {
 		user.Token = &token
 		user.RefreshToken = &refreshToken
 
-		resultInsertionNumber, insertErr := userCollection.InsertOne(ctx, user)
+		_, insertErr := userCollection.InsertOne(ctx, user)
 		if insertErr != nil {
 			helper.RespondWithError(c, http.StatusInternalServerError, "User item was not created", insertErr.Error())
 			return
 		}
 
-		helper.RespondWithSuccess(c, http.StatusOK, "User created successfully", resultInsertionNumber)
+		c.SetCookie("access_token", token, 3600, "/", "", true, true)
+		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
+
+		helper.RespondWithSuccess(c, http.StatusOK, "User created successfully", nil)
 	}
 }
 
+// Login - authenticate user and issue tokens
 func Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
@@ -119,7 +124,7 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		token, refreshToken, err := helper.GenerateAllTokens(*foundUser.Email, *foundUser.Username, *foundUser.UserType, *foundUser.UserID)
+		token, refreshToken, _, _, err := helper.GenerateAllTokens(*foundUser.Email, *foundUser.Username, *foundUser.UserType, *foundUser.UserID)
 		if err != nil {
 			helper.RespondWithError(c, http.StatusInternalServerError, "Failed to generate tokens", err.Error())
 			return
@@ -131,6 +136,26 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		helper.RespondWithSuccess(c, http.StatusOK, "Login successful", foundUser)
+		c.SetCookie("access_token", token, 3600, "/", "", true, true)
+		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
+
+		helper.RespondWithSuccess(c, http.StatusOK, "Login successful", nil)
+	}
+}
+
+// Logout - remove tokens and end session
+func Logout() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.SetCookie("access_token", "", -1, "/", "", true, true)
+		c.SetCookie("refresh_token", "", -1, "/", "", true, true)
+
+		helper.RespondWithSuccess(c, http.StatusOK, "Logout successful", nil)
+	}
+}
+
+// RefreshAccessToken - refreshes access token
+func RefreshAccessToken() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		helper.RefreshToken(c)
 	}
 }

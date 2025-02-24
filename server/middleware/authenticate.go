@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,19 +10,17 @@ import (
 
 func Authenticate() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
+		clientToken, err := c.Cookie("access_token")
 
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			helper.RespondWithError(c, http.StatusUnauthorized, "No Authorization header provided or invalid format", "")
+		if err != nil {
+			helper.RespondWithError(c, http.StatusUnauthorized, "No Authorization cookie provided", "")
 			c.Abort()
 			return
 		}
 
-		clientToken := strings.TrimPrefix(authHeader, "Bearer ")
-
-		claims, err := helper.ValidateToken(clientToken)
-		if err != "" {
-			helper.RespondWithError(c, http.StatusInternalServerError, "Invalid token", err)
+		claims, msg := helper.ValidateToken(clientToken)
+		if msg != "" {
+			helper.RespondWithError(c, http.StatusUnauthorized, "Invalid token", msg)
 			c.Abort()
 			return
 		}

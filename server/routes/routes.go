@@ -8,31 +8,26 @@ import (
 )
 
 func SetupRoutes(router *gin.Engine) {
-	// Health check route
-	HealthLimiter := middleware.RateLimitMiddleware(middleware.HealthLimiter)
 
-	router.GET("/health", HealthLimiter, controller.HealthCheck)
+	// Health check route
+	router.GET("/health", controller.HealthCheck())
 
 	// Authentication routes
-	signupRateLimiter := middleware.RateLimitMiddleware(middleware.SignupLimiter)
-	loginRateLimiter := middleware.RateLimitMiddleware(middleware.LoginLimiter)
+	router.POST("users/signup", controller.Signup())
+	router.POST("users/login", controller.Login())
+	router.POST("/users/logout", controller.Logout())
+	router.POST("/refresh", controller.RefreshAccessToken())
 
-	router.POST("users/signup", signupRateLimiter, controller.Signup())
-	router.POST("users/login", loginRateLimiter, controller.Login())
-
-	// User routes (protected with authentication middleware)
+	// Protected user routes
 	router.Use(middleware.Authenticate())
 	router.GET("/users", controller.GetUsers())
 	router.GET("/users/:userid", controller.GetUser())
 
 	// Task routes
-	taskCreateLimiter := middleware.RateLimitMiddleware(middleware.CreateLimiter)
-	taskDeleteLimiter := middleware.RateLimitMiddleware(middleware.DeleteLimiter)
-
-	router.GET("/tasks", controller.GetTasks)
-	router.GET("/tasks/:id", controller.GetTaskByID)
-	router.POST("/tasks", taskCreateLimiter, controller.PostTask)
-	router.PUT("/tasks/:id", controller.UpdateTask)
-	router.DELETE("/tasks/:id", controller.DeleteTask)
-	router.DELETE("/tasks", taskDeleteLimiter, controller.DeleteAllTasks)
+	router.GET("/tasks", controller.GetTasks())
+	router.GET("/tasks/:id", controller.GetTaskByID())
+	router.POST("/tasks", controller.PostTask())
+	router.PUT("/tasks/:id", controller.UpdateTask())
+	router.DELETE("/tasks/:id", controller.DeleteTask())
+	router.DELETE("/tasks/all", controller.DeleteAllTasks())
 }
