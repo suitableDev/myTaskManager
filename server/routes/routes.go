@@ -8,6 +8,11 @@ import (
 )
 
 func SetupRoutes(router *gin.Engine) {
+	// Health check route
+	HealthLimiter := middleware.RateLimitMiddleware(middleware.HealthLimiter)
+
+	router.GET("/health", HealthLimiter, controller.HealthCheck)
+
 	// Authentication routes
 	signupRateLimiter := middleware.RateLimitMiddleware(middleware.SignupLimiter)
 	loginRateLimiter := middleware.RateLimitMiddleware(middleware.LoginLimiter)

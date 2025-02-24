@@ -21,6 +21,11 @@ func getContextWithTimeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), 10*time.Second)
 }
 
+func HealthCheck(c *gin.Context) {
+	myData := map[string]string{"version": "1.0"}
+	helper.RespondWithSuccess(c, http.StatusOK, "Health check", myData)
+}
+
 // GetTasks - Retrieves all tasks
 func GetTasks(c *gin.Context) {
 	userID, username, valid := helper.GetUserDetails(c)

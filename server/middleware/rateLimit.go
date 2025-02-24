@@ -12,6 +12,7 @@ var (
 	LoginLimiter  = ratelimit.NewBucketWithRate(10, 20)
 	CreateLimiter = ratelimit.NewBucketWithRate(10, 20)
 	DeleteLimiter = ratelimit.NewBucketWithRate(10, 20)
+	HealthLimiter = ratelimit.NewBucketWithRate(10, 50)
 )
 
 func RateLimitMiddleware(rateLimiter *ratelimit.Bucket) gin.HandlerFunc {
