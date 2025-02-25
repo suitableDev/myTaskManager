@@ -9,30 +9,27 @@ import (
 
 func SetupRoutes(router *gin.Engine) {
 	// Health check route
-	HealthLimiter := middleware.RateLimitMiddleware(middleware.HealthLimiter)
-
-	router.GET("/health", HealthLimiter, controller.HealthCheck)
+	router.GET("/health", controller.HealthCheck())
 
 	// Authentication routes
-	signupRateLimiter := middleware.RateLimitMiddleware(middleware.SignupLimiter)
-	loginRateLimiter := middleware.RateLimitMiddleware(middleware.LoginLimiter)
+	router.POST("users/signup", middleware.RateLimitMiddleware(0.1, 1), controller.Signup())
+	router.POST("users/login", middleware.RateLimitMiddleware(0.1, 1), controller.Login())
+	router.POST("/users/logout", controller.Logout())
+	router.POST("/refresh", middleware.RateLimitMiddleware(0.5, 2), controller.RefreshAccessToken())
 
-	router.POST("users/signup", signupRateLimiter, controller.Signup())
-	router.POST("users/login", loginRateLimiter, controller.Login())
-
-	// User routes (protected with authentication middleware)
+	// Authenticate
 	router.Use(middleware.Authenticate())
-	router.GET("/users", controller.GetUsers())
-	router.GET("/users/:userid", controller.GetUser())
 
-	// Task routes
-	taskCreateLimiter := middleware.RateLimitMiddleware(middleware.CreateLimiter)
-	taskDeleteLimiter := middleware.RateLimitMiddleware(middleware.DeleteLimiter)
+	// User Routes
+	router.GET("/users", middleware.RateLimitMiddleware(3, 6), controller.GetUsers())
+	router.GET("/users/:userid", middleware.RateLimitMiddleware(3, 5), controller.GetUser())
 
-	router.GET("/tasks", controller.GetTasks)
-	router.GET("/tasks/:id", controller.GetTaskByID)
-	router.POST("/tasks", taskCreateLimiter, controller.PostTask)
-	router.PUT("/tasks/:id", controller.UpdateTask)
-	router.DELETE("/tasks/:id", controller.DeleteTask)
-	router.DELETE("/tasks", taskDeleteLimiter, controller.DeleteAllTasks)
+	// Task Routes
+	router.GET("/tasks", middleware.RateLimitMiddleware(10, 20), controller.GetTasks())
+	router.GET("/tasks/:id", middleware.RateLimitMiddleware(3, 6), controller.GetTaskByID())
+
+	router.POST("/tasks", middleware.RateLimitMiddleware(1, 3), controller.PostTask())
+	router.PUT("/tasks/:id", middleware.RateLimitMiddleware(2, 5), controller.UpdateTask())
+	router.DELETE("/tasks/:id", middleware.RateLimitMiddleware(0.5, 1), controller.DeleteTask())
+	router.DELETE("/tasks/all", middleware.RateLimitMiddleware(0.5, 1), controller.DeleteAllTasks())
 }
