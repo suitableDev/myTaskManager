@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -75,6 +76,10 @@ func Signup() gin.HandlerFunc {
 		user.UserID = new(string)
 		*user.UserID = user.ID.Hex()
 
+		verificationToken := uuid.New().String()
+		user.VerificationToken = &verificationToken
+		user.Verified = false
+
 		token, refreshToken, _, _, err := helper.GenerateAllTokens(*user.Email, *user.Username, *user.UserType, *user.UserID)
 		if err != nil {
 			helper.RespondWithError(c, http.StatusInternalServerError, "Failed to generate tokens", err.Error())
@@ -90,10 +95,12 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 
+		helper.SendVerificationEmail(*user.Email, verificationToken)
+
 		c.SetCookie("access_token", token, 3600, "/", "", true, true)
 		c.SetCookie("refresh_token", refreshToken, 604800, "/", "", true, true)
 
-		helper.RespondWithSuccess(c, http.StatusOK, "User created successfully", nil)
+		helper.RespondWithSuccess(c, http.StatusOK, "User created successfully, please verify your email", nil)
 	}
 }
 
