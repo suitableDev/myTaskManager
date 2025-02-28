@@ -42,9 +42,12 @@ This project primarily serves as a learning experience for backend development, 
 git clone git@github.com:suitableDev/myTaskManager.git
 cd myTaskManager
 
-# Install backend dependencies
+# Install backend dependencies (the tools our code needs)
 cd server
 go mod tidy
+
+# Install 'air' for live reloading (makes development easier!)
+go install github.com/air-verse/air@latest
 
 # Run the backend with live reloading
 air
