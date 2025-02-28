@@ -13,7 +13,7 @@ type User struct {
 	Username                 *string            `bson:"username" json:"username" validate:"required,min=2,max=30"`
 	Password                 *string            `bson:"password" json:"password,omitempty" validate:"required,min=6,max=30"`
 	UserType                 *string            `bson:"user_type" json:"user_type" validate:"required,eq=ADMIN|eq=USER"`
-	UserID                   *string            `bson:"userid" json:"userid,omitempty"`
+	UserID                   *string            `bson:"user_id" json:"user_id,omitempty"`
 	Token                    *string            `bson:"token" json:"token,omitempty"`
 	RefreshToken             *string            `bson:"refresh_token" json:"refresh_token,omitempty"`
 	CreatedAt                time.Time          `bson:"created_at" json:"created_at"`

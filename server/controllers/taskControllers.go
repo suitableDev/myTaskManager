@@ -42,7 +42,7 @@ func GetTasks() gin.HandlerFunc {
 		defer cancel()
 
 		taskCollection := database.GetTaskCollection()
-		filter := bson.M{"userid": userID}
+		filter := bson.M{"user_id": userID}
 
 		opts := options.Find().SetSort(bson.D{{Key: "created", Value: -1}})
 
@@ -93,7 +93,7 @@ func GetTaskByID() gin.HandlerFunc {
 		defer cancel()
 
 		taskCollection := database.GetTaskCollection()
-		filter := bson.M{"_id": objId, "userid": userID}
+		filter := bson.M{"_id": objId, "user_id": userID}
 
 		var task model.Task
 		err = taskCollection.FindOne(ctx, filter).Decode(&task)
@@ -189,7 +189,7 @@ func UpdateTask() gin.HandlerFunc {
 		update["updated"] = time.Now().UTC()
 
 		collection := database.GetTaskCollection()
-		filter := bson.M{"_id": id, "userid": userID}
+		filter := bson.M{"_id": id, "user_id": userID}
 
 		result, err := collection.UpdateOne(c.Request.Context(), filter, bson.M{"$set": update})
 		if err != nil {
@@ -223,7 +223,7 @@ func DeleteTask() gin.HandlerFunc {
 		}
 
 		collection := database.GetTaskCollection()
-		filter := bson.M{"_id": id, "userid": userID}
+		filter := bson.M{"_id": id, "user_id": userID}
 		result, err := collection.DeleteOne(c.Request.Context(), filter)
 		if err != nil {
 			helper.RespondWithError(c, http.StatusInternalServerError, "Error deleting task", err.Error())
@@ -249,7 +249,7 @@ func DeleteAllTasks() gin.HandlerFunc {
 		}
 
 		collection := database.GetTaskCollection()
-		filter := bson.M{"userid": userID}
+		filter := bson.M{"user_id": userID}
 		result, err := collection.DeleteMany(c.Request.Context(), filter)
 		if err != nil {
 			helper.RespondWithError(c, http.StatusInternalServerError, "Error deleting all tasks", err.Error())

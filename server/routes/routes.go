@@ -25,7 +25,7 @@ func SetupRoutes(router *gin.Engine) {
 
 	// User Routes
 	router.GET("/users", middleware.RateLimitMiddleware(3, 6), controller.GetUsers())
-	router.GET("/users/:userid", middleware.RateLimitMiddleware(3, 5), controller.GetUser())
+	router.GET("/users/:user_id", middleware.RateLimitMiddleware(3, 5), controller.GetUser())
 
 	// Task Routes
 	router.GET("/tasks", middleware.RateLimitMiddleware(10, 20), controller.GetTasks())
