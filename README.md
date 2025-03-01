@@ -88,7 +88,7 @@ go install github.com/cosmtrek/air@latest
 air
 ```
 # Option 2: Run Locally With Docker 🐳
-*From main app folder. Ensure you have updateed the example docker-compose.env*
+*From main app folder. Ensure you have updated the example docker-compose.env*
 
 Build and start the backend and database using Docker Compose
 
