@@ -11,7 +11,7 @@ This project primarily serves as a learning experience for backend development, 
 - Secure password storage using **bcrypt**  
 - Rate-limiting with **ratelimit**  
 - CRUD operations with **MongoDB**  
-- **Email functionality with Postmark** (for account verification, password reset, etc.)  
+- Email functionality with **Postmark** (for account verification, password reset, etc.)  
 - Backend uses **Air** for live reloading during development  
 
 # 🛠️ Technical Overview  
