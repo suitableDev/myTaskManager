@@ -1,5 +1,28 @@
-node_modules
+# General Project Files
+tmp/
+.air.toml
 .env
 docker-compose.env
-.air.toml
-tmp/
+
+# Environment Files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Build/Output Directories
+/build
+/coverage
+
+# Operating System/Editor Specific Files
+.DS_Store
+
+# Log Files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
